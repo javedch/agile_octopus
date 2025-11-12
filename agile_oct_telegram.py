@@ -100,13 +100,13 @@ def plot_prices(rates):
         if price > threshold:
             plt.scatter(times[i], price, color='tomato', s=100, zorder=5)
             plt.text(times[i], price + 0.3, times[i], color='tomato', fontsize=8, ha='center', va='bottom')
-        elif price <= go_rate:
-            plt.scatter(times[i], price, color='violet', s=100, zorder=5)
-            plt.text(times[i], price + 0.3, times[i], color='violet', fontsize=8, ha='center', va='bottom')
         elif price <= 0:
             plt.scatter(times[i], price, color='lime', s=100, zorder=5)
             plt.text(times[i], price + 0.3, times[i], color='lime', fontsize=8, ha='center', va='bottom')
-
+        elif price <= go_rate:
+            plt.scatter(times[i], price, color='violet', s=100, zorder=5)
+            plt.text(times[i], price + 0.3, times[i], color='violet', fontsize=8, ha='center', va='bottom')
+            
     plt.text(times[0], threshold + 0.2, f"Threshold: {threshold}p/kWh", color='orange', fontsize=10, va='bottom', ha='left')
     plt.text(times[0], go_rate + 0.2, f"go_rate: {go_rate}p/kWh", color='violet', fontsize=10, va='bottom', ha='left')
 
