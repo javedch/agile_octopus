@@ -101,8 +101,8 @@ def plot_prices(rates):
             plt.scatter(times[i], price, color='tomato', s=100, zorder=5)
             plt.text(times[i], price + 0.3, times[i], color='tomato', fontsize=8, ha='center', va='bottom')
         elif price <= go_rate:
-            plt.scatter(times[i], price, color='lime', s=100, zorder=5)
-            plt.text(times[i], price + 0.3, times[i], color='darkviolet', fontsize=8, ha='center', va='bottom')
+            plt.scatter(times[i], price, color='violet', s=100, zorder=5)
+            plt.text(times[i], price + 0.3, times[i], color='violet', fontsize=8, ha='center', va='bottom')
         elif price <= 0:
             plt.scatter(times[i], price, color='lime', s=100, zorder=5)
             plt.text(times[i], price + 0.3, times[i], color='lime', fontsize=8, ha='center', va='bottom')
