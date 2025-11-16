@@ -78,41 +78,69 @@ def plot_prices(rates):
     times = [
         datetime.fromisoformat(r["valid_from"].replace("Z", "+00:00"))
         .astimezone(london_tz)
-        .strftime("%H:%M")
         for r in rates_sorted
     ]
 
+    time_labels = [t.strftime("%H:%M") for t in times]
     prices = [r["value_inc_vat"] for r in rates_sorted]
 
-    date_str = datetime.fromisoformat(rates_sorted[0]["valid_from"].replace("Z", "+00:00")).astimezone(london_tz).strftime("%Y-%m-%d")
+    date_str = times[0].strftime("%Y-%m-%d")
 
     plt.style.use('dark_background')
     plt.figure(figsize=(12, 5))
-    plt.step(times, prices, where='post', color='deepskyblue', linewidth=2)
+    plt.step(time_labels, prices, where='post', color='deepskyblue', linewidth=2)
 
+    # --- GO RATE LOGIC ---
+    OFFPEAK_START = datetime.strptime("00:30", "%H:%M").time()
+    OFFPEAK_END = datetime.strptime("05:30", "%H:%M").time()
+
+    def is_offpeak(t):
+        return OFFPEAK_START <= t.time() < OFFPEAK_END
+
+    def go_rate_for_time(t):
+        return 8.5 if is_offpeak(t) else 30.92
+
+    # Plot dynamic Go rate
+    go_rates = [go_rate_for_time(t) for t in times]
+    plt.step(time_labels, go_rates, where="post", color="darkviolet", linestyle="--", linewidth=1.5)
+
+    # --- Highlight logic ---
     threshold = 25.94
-    plt.axhline(y=threshold, color='orange', linestyle='--', linewidth=1.5)
-
-    go_rate = 8.5
-    plt.axhline(y=go_rate, color='darkviolet', linestyle='--', linewidth=1.5)
 
     for i, price in enumerate(prices):
+        t = times[i]
+        label = time_labels[i]
+
         if price > threshold:
-            plt.scatter(times[i], price, color='tomato', s=100, zorder=5)
-            plt.text(times[i], price + 0.3, times[i], color='tomato', fontsize=8, ha='center', va='bottom')
+            plt.scatter(label, price, color='tomato', s=100, zorder=5)
+            plt.text(label, price + 0.3, label, color='tomato', fontsize=8, ha='center', va='bottom')
+
         elif price <= 0:
-            plt.scatter(times[i], price, color='lime', s=100, zorder=5)
-            plt.text(times[i], price + 0.3, times[i], color='lime', fontsize=8, ha='center', va='bottom')
-        elif price <= go_rate:
-            plt.scatter(times[i], price, color='violet', s=100, zorder=5)
-            plt.text(times[i], price + 0.3, times[i], color='violet', fontsize=8, ha='center', va='bottom')
-            
-    plt.text(times[0], threshold + 0.2, f"Threshold: {threshold}p/kWh", color='orange', fontsize=10, va='bottom', ha='left')
-    plt.text(times[0], go_rate + 0.2, f"go_rate: {go_rate}p/kWh", color='violet', fontsize=10, va='bottom', ha='left')
+            plt.scatter(label, price, color='lime', s=100, zorder=5)
+            plt.text(label, price + 0.3, label, color='lime', fontsize=8, ha='center', va='bottom')
+
+        # VIOLET only when agile < go rate during off-peak
+        elif price <= 8.5:
+            plt.scatter(label, price, color='violet', s=100, zorder=5)
+            plt.text(label, price + 0.3, label, color='violet', fontsize=8, ha='center', va='bottom')
+
+    # Text labels
+    plt.text(
+        time_labels[0],
+        30.92 + 0.5,
+        "Go Rate: 30.92p peak / 8.5p off-peak",
+        color='violet',
+        fontsize=10,
+        ha='left'
+    )
+
+    plt.axhline(y=threshold, color='orange', linestyle='--', linewidth=1.5)
+    plt.text(time_labels[0], threshold + 0.3, f"Threshold: {threshold}p", color='orange', fontsize=10)
 
     plt.xticks(rotation=90, color='white')
     plt.yticks(color='white')
     plt.grid(True, linestyle='--', color='gray', alpha=0.3)
+
     plt.title(f"⚡ Agile Octopus Prices for {date_str}", color='white', fontsize=14)
     plt.ylabel("p/kWh", color='white')
 
