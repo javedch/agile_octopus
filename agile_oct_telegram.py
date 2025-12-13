@@ -72,6 +72,11 @@ def process_prices(rates, go_sc=41.74, agile_sc=59.26):
     # Cheaper option & difference
     result["winner"] = np.where(result["go_price"] < result["agile_price"], "go", "agile")
     result["price_diff"] = (result["go_price"] - result["agile_price"]).abs()
+    result["rate"] = np.where(
+        result["winner"] == "go",
+        result["go_price"] / (result["hours"] * 2 * charge_rate_30_min ),
+        result["agile_price"] / (result["hours"] * 2 * charge_rate_30_min ),
+    )
 
     # Format start_time and round numbers
     # Convert start_time to datetime
