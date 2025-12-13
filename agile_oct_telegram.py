@@ -6,11 +6,15 @@ import asyncio
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from telegram import Bot
-from loguru import logger  # 🧩 Add Loguru
+from loguru import logger
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 
 # --- CONFIG ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IMG_PATH = os.path.join(BASE_DIR, "agile_prices.png")
+TABLE_IMG_PATH = os.path.join(BASE_DIR, "price_table_dark.png")
 LAST_RUN_FILE = os.path.join(BASE_DIR, "last_run.txt")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 PRODUCT_CODE = "AGILE-24-10-01"
@@ -33,6 +37,95 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 PRODUCT_CODE = os.getenv("PRODUCT_CODE")
 TARIFF_CODE = os.getenv("TARIFF_CODE")
+
+charge_rate_30_min = 2.2
+
+def sum_current_and_next_n(series, n):
+    """Sum current row plus next n rows."""
+    return series.rolling(window=n+1, min_periods=1).sum().shift(-n)
+
+def process_prices(rates, go_sc=41.74, agile_sc=59.26):
+    """
+    Convert rates JSON to a DataFrame with forward-looking sums,
+    cheaper options, and price differences.
+    """
+    df = pd.DataFrame(rates).sort_values(by="valid_from")
+    df['cost'] = df['value_exc_vat'] * charge_rate_30_min
+
+    duration_cols = [f"cost_for_{0.5*n+0.5}_hours" for n in range(1, 8)]
+    for n, col in enumerate(duration_cols, start=1):
+        df[col] = sum_current_and_next_n(df["cost"], n)
+
+    # Compute minima per duration column
+    min_prices = df[duration_cols].min()
+    idx_min = df[duration_cols].idxmin()
+
+    result = pd.DataFrame({
+        "hours": [float(col.split('_')[2]) for col in duration_cols],
+        "start_time": df.loc[idx_min, "valid_from"].values
+    })
+
+    # Compute go and agile prices
+    result['go_price'] = 8.5 * result.hours * 2 * charge_rate_30_min + go_sc
+    result['agile_price'] = min_prices.values + agile_sc
+
+    # Cheaper option & difference
+    result["winner"] = np.where(result["go_price"] < result["agile_price"], "go", "agile")
+    result["price_diff"] = (result["go_price"] - result["agile_price"]).abs()
+
+    # Format start_time and round numbers
+    # Convert start_time to datetime
+    start_dt = pd.to_datetime(result["start_time"])
+    
+    # Create separate columns
+    result["date"] = start_dt.dt.date
+    result["time"] = start_dt.dt.time
+    
+    # Optional: drop the original start_time column
+    result = result.drop(columns=["start_time"], errors="ignore")
+    result = result.round(1)
+
+    return result
+
+def plot_price_table(df, figsize=(10,2), dark_mode=True, save_path=None):
+    """
+    Plot a DataFrame as a dark-mode table (or light-mode if dark_mode=False).
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.axis('off')
+    
+    if dark_mode:
+        fig.patch.set_facecolor('#2e2e2e')
+        ax.set_facecolor('#2e2e2e')
+        header_color = '#1f1f1f'
+        row_color = '#2e2e2e'
+        text_color = 'white'
+    else:
+        header_color = '#f0f0f0'
+        row_color = 'white'
+        text_color = 'black'
+
+    table = ax.table(cellText=df.values,
+                     colLabels=df.columns,
+                     cellLoc='center',
+                     loc='center')
+
+    for (i, j), cell in table.get_celld().items():
+        cell.set_edgecolor('white')
+        if i == 0:  # header
+            cell.set_facecolor(header_color)
+            cell.set_text_props(color=text_color, weight='bold')
+        else:
+            cell.set_facecolor(row_color)
+            cell.set_text_props(color=text_color)
+
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1, 1.5)
+
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight', facecolor=fig.get_facecolor())
+    plt.show()
 
 
 def has_already_run_today():
@@ -159,6 +252,14 @@ async def send_chart():
     logger.info("Chart sent successfully.")
 
 
+async def send_table():
+    logger.info("Sending table to Telegram...")
+    bot = Bot(token=BOT_TOKEN)
+    with open(TABLE_IMG_PATH, "rb") as img:
+        await bot.send_photo(chat_id=CHAT_ID, photo=img, caption="📊 Optimum tarriff tomorow")
+    logger.info("Table sent successfully.")
+
+
 async def send_error(message):
     logger.error(f"Sending error to Telegram: {message}")
     bot = Bot(token=BOT_TOKEN)
@@ -175,7 +276,10 @@ async def main():
         if not rates:
             raise ValueError("No rates returned")
         plot_prices(rates)
+        result_df = process_prices(rates)
+        plot_price_table(result_df, save_path="price_table_dark.png")
         await send_chart()
+        await send_table()
         mark_as_run_today()
     except Exception as e:
         logger.exception("An error occurred")
