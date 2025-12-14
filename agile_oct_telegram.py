@@ -282,7 +282,7 @@ async def main():
             raise ValueError("No rates returned")
         plot_prices(rates)
         result_df = process_prices(rates)
-        plot_price_table(result_df, save_path="price_table_dark.png")
+        plot_price_table(result_df, save_path=f"{BASE_DIR}/price_table_dark.png")
         await send_chart()
         await send_table()
         mark_as_run_today()
