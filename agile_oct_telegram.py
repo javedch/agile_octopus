@@ -203,7 +203,7 @@ def plot_prices(rates):
     plt.step(time_labels, go_rates, where="post", color="darkviolet", linestyle="--", linewidth=1.5)
 
     # --- Highlight logic ---
-    threshold = 25.94
+    threshold = 27.8
 
     for i, price in enumerate(prices):
         t = times[i]
