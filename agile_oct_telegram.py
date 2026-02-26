@@ -37,6 +37,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 PRODUCT_CODE = os.getenv("PRODUCT_CODE")
 TARIFF_CODE = os.getenv("TARIFF_CODE")
+GO_PRICE = 9
 
 charge_rate_30_min = 2.2
 
@@ -66,7 +67,7 @@ def process_prices(rates, go_sc=41.74, agile_sc=59.26):
     })
 
     # Compute go and agile prices
-    result['go_price'] = 8.5 * result.hours * 2 * charge_rate_30_min + go_sc
+    result['go_price'] = GO_PRICE * result.hours * 2 * charge_rate_30_min + go_sc
     result['agile_price'] = min_prices.values + agile_sc
 
     # Cheaper option & difference
@@ -196,7 +197,7 @@ def plot_prices(rates):
         return OFFPEAK_START <= t.time() < OFFPEAK_END
 
     def go_rate_for_time(t):
-        return 8.5 if is_offpeak(t) else 30.92
+        return GO_PRICE if is_offpeak(t) else 30.92
 
     # Plot dynamic Go rate
     go_rates = [go_rate_for_time(t) for t in times]
@@ -218,7 +219,7 @@ def plot_prices(rates):
             plt.text(label, price + 0.3, label, color='lime', fontsize=8, ha='center', va='bottom')
 
         # VIOLET only when agile < go rate during off-peak
-        elif price <= 8.5:
+        elif price <= GO_PRICE:
             plt.scatter(label, price, color='violet', s=100, zorder=5)
             plt.text(label, price + 0.3, label, color='violet', fontsize=8, ha='center', va='bottom')
 
